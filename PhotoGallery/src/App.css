@@ -96,3 +96,47 @@ main h1 {
     gap: 0.75rem;
   }
 }
+
+/* Detail view */
+.detail-view {
+  margin-top: 0.5rem;
+}
+
+.back-button {
+  margin-bottom: 1rem;
+}
+
+.detail-card {
+  background: #121212;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  overflow: hidden;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.detail-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.detail-meta .detail-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.25rem;
+}
+
+.detail-meta .description {
+  color: #bdbdbd;
+  margin-top: 0.25rem;
+}
+
+/* Wider screens: place image and meta side-by-side */
+@media (min-width: 900px) {
+  .detail-card {
+    grid-template-columns: 2fr 1fr;
+    align-items: start;
+  }
+}
