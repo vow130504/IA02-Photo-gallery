@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useParams, useNavigate } from 'react-router-dom'
 import './App.css'
 
 type Photo = {
@@ -18,14 +19,33 @@ function App() {
   const [loadingMore, setLoadingMore] = useState<boolean>(false)
   const [hasMore, setHasMore] = useState<boolean>(true)
 
-  // New: detail view state
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedPhoto, setSelectedPhoto] = useState<Photo | null>(null)
-  const [detailLoading, setDetailLoading] = useState<boolean>(false)
-  const [detailError, setDetailError] = useState<string | null>(null)
-
   const LIMIT = 30
-  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // New: observer + callback ref
+  const observerRef = useRef<IntersectionObserver | null>(null)
+  const setSentinel = useCallback((node: HTMLDivElement | null) => {
+    // cleanup previous observer
+    if (observerRef.current) {
+      observerRef.current.disconnect()
+      observerRef.current = null
+    }
+    if (!node || !hasMore) return
+    let ticking = false
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (entry.isIntersecting && !loading && !loadingMore && hasMore) {
+          if (ticking) return
+          ticking = true
+          setPage((p) => p + 1)
+          setTimeout(() => (ticking = false), 200)
+        }
+      },
+      { root: null, rootMargin: '300px 0px', threshold: 0 }
+    )
+    observer.observe(node)
+    observerRef.current = observer
+  }, [hasMore, loading, loadingMore])
 
   // Fetch photos when page changes (handles initial load + pagination)
   useEffect(() => {
@@ -55,178 +75,153 @@ function App() {
     return () => controller.abort()
   }, [page])
 
-  // IntersectionObserver to trigger loading more when the sentinel enters view
-  useEffect(() => {
-    if (!hasMore) return
-    const node = sentinelRef.current
-    if (!node) return
-    let ticking = false
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (entry.isIntersecting && !loading && !loadingMore && hasMore) {
-          // Throttle to avoid rapid multi-triggers
-          if (ticking) return
-          ticking = true
-          setPage((p) => p + 1)
-          // allow another trigger after a short tick
-          setTimeout(() => (ticking = false), 200)
-        }
-      },
-      {
-        root: null,
-        rootMargin: '300px 0px',
-        threshold: 0,
-      }
-    )
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [hasMore, loading, loadingMore])
+  return (
+    <Router>
+      <main>
+        <Routes>
+          <Route path="/" element={<Navigate to="/photos" replace />} />
+          <Route
+            path="/photos"
+            element={
+              <Gallery
+                photos={photos}
+                loading={loading}
+                error={error}
+                loadingMore={loadingMore}
+                hasMore={hasMore}
+                sentinelRef={setSentinel}
+              />
+            }
+          />
+          <Route path="/photos/:id" element={<PhotoDetail photos={photos} />} />
+        </Routes>
+      </main>
+    </Router>
+  )
+}
 
-  // New: hash-based routing for detail view
-  useEffect(() => {
-    const parse = () => {
-      const m = window.location.hash.match(/^#\/photo\/(\d+)/)
-      setSelectedId(m ? m[1] : null)
-    }
-    parse()
-    window.addEventListener('hashchange', parse)
-    return () => window.removeEventListener('hashchange', parse)
-  }, [])
+export default App
 
-  // New: fetch single photo details (supports direct links)
+// --- child views ---
+
+type GalleryProps = {
+  photos: Photo[]
+  loading: boolean
+  error: string | null
+  loadingMore: boolean
+  hasMore: boolean
+  sentinelRef: (node: HTMLDivElement | null) => void
+}
+
+function Gallery({ photos, loading, error, loadingMore, hasMore, sentinelRef }: GalleryProps) {
+  return (
+    <>
+      <h1>Photo Gallery</h1>
+      {loading && <p>Loading photos…</p>}
+      {error && (
+        <p role="alert" style={{ color: 'tomato' }}>
+          {error}
+        </p>
+      )}
+      <ul className="photo-grid" aria-live="polite">
+        {photos.map((p) => {
+          const widths = [320, 480, 640, 800]
+          const srcSet = widths.map((w) => `https://picsum.photos/id/${p.id}/${w}/${Math.round(w * 0.75)} ${w}w`).join(', ')
+          const sizes = '(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 33vw'
+          const thumb = `https://picsum.photos/id/${p.id}/480/360`
+          return (
+            <li className="photo-card" key={p.id}>
+              <Link to={`/photos/${p.id}`}>
+                <img
+                  src={thumb}
+                  srcSet={srcSet}
+                  sizes={sizes}
+                  alt={`Photo by ${p.author}`}
+                  loading="lazy"
+                  width={480}
+                  height={360}
+                />
+              </Link>
+              <div className="meta">
+                <span className="author">{p.author}</span>
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+      {/* Loading more indicator */}
+      {loadingMore && !loading && (
+        <p className="loading-more" aria-live="polite">
+          Loading more…
+        </p>
+      )}
+      {/* End of list */}
+      {!loading && !loadingMore && !hasMore && photos.length > 0 && (
+        <p className="end-message" aria-live="polite">
+          You've reached the end.
+        </p>
+      )}
+      {/* Sentinel for intersection observer */}
+      <div ref={sentinelRef} className="sentinel" aria-hidden="true" />
+    </>
+  )
+}
+
+function PhotoDetail({ photos }: { photos: Photo[] }) {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const [photo, setPhoto] = useState<Photo | null>(null)
+  const [loading, setLoading] = useState<boolean>(false)
+  const [error, setError] = useState<string | null>(null)
+
   useEffect(() => {
-    if (!selectedId) {
-      setSelectedPhoto(null)
-      setDetailError(null)
-      setDetailLoading(false)
-      return
-    }
-    const cached = photos.find((p) => p.id === selectedId)
+    if (!id) return
+    const cached = photos.find((p) => p.id === id)
     if (cached) {
-      setSelectedPhoto(cached)
+      setPhoto(cached)
       return
     }
     const controller = new AbortController()
     ;(async () => {
       try {
-        setDetailLoading(true)
-        setDetailError(null)
-        const res = await fetch(`https://picsum.photos/id/${selectedId}/info`, {
-          signal: controller.signal,
-        })
-        if (!res.ok) throw new Error(`Failed to fetch photo ${selectedId}`)
+        setLoading(true)
+        setError(null)
+        const res = await fetch(`https://picsum.photos/id/${id}/info`, { signal: controller.signal })
+        if (!res.ok) throw new Error(`Failed to fetch photo ${id}`)
         const info: Photo = await res.json()
-        setSelectedPhoto(info)
+        setPhoto(info)
       } catch (e: unknown) {
         if ((e as any)?.name === 'AbortError') return
-        setDetailError(e instanceof Error ? e.message : 'Unknown error loading photo')
+        setError(e instanceof Error ? e.message : 'Unknown error loading photo')
       } finally {
-        setDetailLoading(false)
+        setLoading(false)
         window.scrollTo({ top: 0 })
       }
     })()
     return () => controller.abort()
-  }, [selectedId, photos])
-
-  const openDetail = (p: Photo) => {
-    window.location.hash = `#/photo/${p.id}`
-  }
-  const closeDetail = () => {
-    if (window.history.length > 1) window.history.back()
-    else window.location.hash = ''
-  }
+  }, [id, photos])
 
   return (
-    <main>
-      {/* New: conditional routing - show detail or gallery */}
-      {selectedId ? (
-        <section className="detail-view">
-          <button className="back-button" onClick={closeDetail} aria-label="Back to gallery">
-            ← Back
-          </button>
-          {detailLoading && <p>Loading photo…</p>}
-          {detailError && (
-            <p role="alert" style={{ color: 'tomato' }}>
-              {detailError}
-            </p>
-          )}
-          {selectedPhoto && (
-            <article className="detail-card">
-              <img
-                src={selectedPhoto.download_url}
-                alt={`Full-size photo by ${selectedPhoto.author}`}
-                className="detail-image"
-              />
-              <div className="detail-meta">
-                <h2 className="detail-title">Photo {selectedPhoto.id}</h2>
-                <p className="author">By {selectedPhoto.author}</p>
-                <p className="description">No description available.</p>
-              </div>
-            </article>
-          )}
-        </section>
-      ) : (
-        <>
-          <h1>Photo Gallery</h1>
-          {loading && <p>Loading photos…</p>}
-          {error && (
-            <p role="alert" style={{ color: 'tomato' }}>
-              {error}
-            </p>
-          )}
-          <ul className="photo-grid" aria-live="polite">
-            {photos.map((p) => {
-              const widths = [320, 480, 640, 800]
-              const srcSet = widths
-                .map((w) => `https://picsum.photos/id/${p.id}/${w}/${Math.round(w * 0.75)} ${w}w`)
-                .join(', ')
-              const sizes = '(max-width: 600px) 100vw, (max-width: 1024px) 50vw, 33vw'
-              const thumb = `https://picsum.photos/id/${p.id}/480/360`
-              return (
-                <li className="photo-card" key={p.id}>
-                  <a
-                    href={`#/photo/${p.id}`}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      openDetail(p)
-                    }}
-                  >
-                    <img
-                      src={thumb}
-                      srcSet={srcSet}
-                      sizes={sizes}
-                      alt={`Photo by ${p.author}`}
-                      loading="lazy"
-                      width={480}
-                      height={360}
-                    />
-                  </a>
-                  <div className="meta">
-                    <span className="author">{p.author}</span>
-                  </div>
-                </li>
-              )
-            })}
-          </ul>
-          {/* Loading more indicator */}
-          {loadingMore && !loading && (
-            <p className="loading-more" aria-live="polite">
-              Loading more…
-            </p>
-          )}
-          {/* End of list */}
-          {!loading && !loadingMore && !hasMore && photos.length > 0 && (
-            <p className="end-message" aria-live="polite">
-              You've reached the end.
-            </p>
-          )}
-          {/* Sentinel for intersection observer */}
-          <div ref={sentinelRef} className="sentinel" aria-hidden="true" />
-        </>
+    <section className="detail-view">
+      <button className="back-button" onClick={() => navigate(-1)} aria-label="Back to gallery">
+        ← Back
+      </button>
+      {loading && <p>Loading photo…</p>}
+      {error && (
+        <p role="alert" style={{ color: 'tomato' }}>
+          {error}
+        </p>
       )}
-    </main>
+      {photo && (
+        <article className="detail-card">
+          <img src={photo.download_url} alt={`Full-size photo by ${photo.author}`} className="detail-image" />
+          <div className="detail-meta">
+            <h2 className="detail-title">Untitled Photo</h2>
+            <p className="author">By {photo.author}</p>
+            <p className="description">No description available.</p>
+          </div>
+        </article>
+      )}
+    </section>
   )
 }
-
-export default App
