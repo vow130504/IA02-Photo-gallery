@@ -20,6 +20,13 @@ main h1 {
   gap: 1rem;
 }
 
+/* Desktop: force 5 items per row */
+@media (min-width: 900px) {
+  .photo-grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
+}
+
 .photo-card {
   background: #121212;
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -56,4 +63,36 @@ main h1 {
 .photo-card:hover {
   transform: translateY(-2px);
   transition: transform 160ms ease;
+}
+
+/* Only apply hover lift on devices that support hover */
+@media (hover: hover) and (pointer: fine) {
+  .photo-card:hover {
+    transform: translateY(-2px);
+    transition: transform 160ms ease;
+  }
+}
+
+/* Loading / end messages */
+.loading-more,
+.end-message {
+  text-align: center;
+  color: #bdbdbd;
+  margin: 1rem 0;
+}
+
+/* Sentinel spacer to ensure IO has room to trigger */
+.sentinel {
+  height: 1px;
+}
+
+/* Small screens: more flexible columns and tighter gaps */
+@media (max-width: 600px) {
+  #root {
+    padding: 1rem;
+  }
+  .photo-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
 }
