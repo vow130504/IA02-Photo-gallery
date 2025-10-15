@@ -1,7 +1,8 @@
 // D:\AWeb\Week02\IA02-Photo-gallery\PhotoGallery\src\App.tsx
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter as Router // THAY THẾ BrowserRouter bằng HashRouter as Router
+      , Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import type { Photo } from './types' // Import type Photo
 import Gallery from './components/Gallery' // Import component Gallery
@@ -96,7 +97,7 @@ function App() {
   }
 
   return (
-    <Router basename={BASE_NAME}>
+    <Router>
       <main className="container mx-auto p-4">
         <Routes>
           {/* Redirect từ root / sang /photos */}
