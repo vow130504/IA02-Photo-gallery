@@ -254,9 +254,16 @@ function PhotoDetail({ photos }: { photos: Photo[] }) {
         <article className="detail-card">
           <img src={photo.download_url} alt={`Full-size photo by ${photo.author}`} className="detail-image" />
           <div className="detail-meta">
-            <h2 className="detail-title">Untitled Photo</h2>
+            <h2 className="detail-title">Photo {photo.id}</h2>
             <p className="author">By {photo.author}</p>
-            <p className="description">No description available.</p>
+            <p className="description">API Lorem Picsum không cung cấp tiêu đề hay mô tả cho ảnh.</p>
+            <p className="description">Kích thước: {photo.width} × {photo.height}px</p>
+            <p className="description">
+              Nguồn:{' '}
+              <a href={photo.url} target="_blank" rel="noreferrer">
+                picsum.photos/id/{photo.id}
+              </a>
+            </p>
           </div>
         </article>
       )}
