@@ -101,7 +101,7 @@ function App() {
       <main className="container mx-auto p-4">
         <Routes>
           {/* Redirect từ root / sang /photos */}
-          <Route path="/" element={<Navigate to="/photos" replace />} />
+          <Route path="/" element={<Navigate to="#/photos" replace />} />
           
           {/* Route cho trang Gallery chính */}
           <Route
