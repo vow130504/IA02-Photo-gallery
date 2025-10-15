@@ -6,7 +6,8 @@ import './App.css'
 import type { Photo } from './types' // Import type Photo
 import Gallery from './components/Gallery' // Import component Gallery
 import PhotoDetail from './components/PhotoDetail' // Import component PhotoDetail
-
+// Định nghĩa đường dẫn cơ sở của repo GitHub
+const BASE_NAME = "/IA02-Photo-gallery"; 
 const LIMIT = 30
 // Picsum hỗ trợ phân trang qua ?page và ?limit.
 // Chúng ta yêu cầu các lô nhỏ để thư viện có thể tải thêm dần dần (cuộn vô hạn).
@@ -95,7 +96,7 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename={BASE_NAME}>
       <main className="container mx-auto p-4">
         <Routes>
           {/* Redirect từ root / sang /photos */}
